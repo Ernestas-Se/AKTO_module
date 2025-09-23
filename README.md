@@ -1,7 +1,7 @@
 # AKTO_module
 
 ## Overview
-This Odoo module provides enhancements and customizations for product management, including:
+This Odoo 19 module provides enhancements and customizations for product management, including:
 - Safety Stock field for products
 - Custom product form tweaks
 - Unique item code enforcement (case-insensitive, ignores blanks)
@@ -23,12 +23,9 @@ This Odoo module provides enhancements and customizations for product management
 
 ## Notable Conventions
 - All product codes are labeled as "No." in the UI.
-- View XML files are merged where possible for maintainability.
-- Redundant or duplicate logic is minimized.
+- All `views` has to have "AKTO_" prefix
 
 ## To Do / Notes
 - [ ] Review and update this README with any additional business logic or conventions.
 - [ ] Add any special instructions for deployment or upgrades.
 
----
-_Edit this file to add more details about your module's purpose, business rules, or special requirements._
