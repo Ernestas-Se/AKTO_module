@@ -72,4 +72,3 @@ class ProductTemplateCreateGuard(models.Model):
                     raise ValidationError(_('Item Code is required and cannot be blank.'))
 
         return records
-

@@ -14,5 +14,5 @@
         "views/default_code_label_views.xml"
     ],
     "installable": True,
-    "application": False
+    "application": True
 }
