@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <!-- Product Template form: replace node; keep Odoo's visibility rule for multi-variant templates -->
+    <record id="view_product_template_form_default_code_label" model="ir.ui.view">
+        <field name="name">product.template.form.default_code.label</field>
+        <field name="model">product.template</field>
+        <field name="inherit_id" ref="product.product_template_only_form_view"/>
+        <field name="priority" eval="70"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet//field[@name='default_code']" position="replace">
+                <field name="default_code" string="Item Code" invisible="product_variant_count &gt; 1"/>
+            </xpath>
+        </field>
+    </record>
+
+    <!-- Product Variant form: replace node; always show with new label -->
+    <record id="view_product_variant_form_default_code_label" model="ir.ui.view">
+        <field name="name">product.product.form.default_code.label</field>
+        <field name="model">product.product</field>
+        <field name="inherit_id" ref="product.product_normal_form_view"/>
+        <field name="priority" eval="70"/>
+        <field name="arch" type="xml">
+            <xpath expr="//sheet//field[@name='default_code']" position="replace">
+                <field name="default_code" string="Item Code"/>
+            </xpath>
+        </field>
+    </record>
+</odoo>
