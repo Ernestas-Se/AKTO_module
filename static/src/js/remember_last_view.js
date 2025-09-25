@@ -1,12 +1,10 @@
 /** @odoo-module **/
 
 /**
- * Remember the last view (kanban/list/…) used for each action and restore it
- * next time that action is opened.
+ * Initialize a last-view key on first load, and reuse it next time.
+ * Also keeps remembering when the view changes (via Layout-level switch).
  *
- * - Stores per-action view type in localStorage (per browser).
- * - Only switches if the stored view exists for the action.
- * - Uses the v17+ patch API (patch(target, extensionObject)).
+ * Works with Odoo 17/18/19 (OWL). Uses patch(target, extensionObject).
  */
 
 import { patch } from "@web/core/utils/patch";
@@ -28,15 +26,13 @@ function getAllowedViewTypes(action) {
     }
     if (Array.isArray(action?.views)) {
         for (const pair of action.views) {
-            // pair format: [view_id, view_type]
-            if (pair && pair[1]) allowed.add(String(pair[1]).trim());
+            if (pair && pair[1]) allowed.add(String(pair[1]).trim()); // [view_id, view_type]
         }
     }
     return allowed;
 }
 function getCurrentViewFromLayout(layoutInstance) {
-    // Different Odoo builds may expose the current view type on props as
-    // `activeView` or nested under `display.activeView`.
+    // Some builds expose it as props.activeView; others nest under props.display.activeView
     return (
         layoutInstance.props?.activeView ||
         layoutInstance.props?.display?.activeView ||
@@ -44,7 +40,6 @@ function getCurrentViewFromLayout(layoutInstance) {
     );
 }
 
-/* 1) When the user switches view via the view switcher, remember it. */
 patch(Layout.prototype, {
     async onSwitchView(ev) {
         const res = await super.onSwitchView(...arguments);
@@ -52,18 +47,12 @@ patch(Layout.prototype, {
             const action = getAction(this.env);
             const k = getActionKey(action);
             const v = ev?.detail?.viewType || getCurrentViewFromLayout(this);
-            if (k && v) {
-                window.localStorage.setItem(k, v);
-            }
-        } catch {
-            // ignore storage errors
-        }
+            if (k && v) localStorage.setItem(k, v);
+        } catch {}
         return res;
     },
 });
 
-/* 2) On load, if we have a stored view for this action and it is allowed,
-      relaunch the action once with that view (keeps breadcrumbs clean). */
 patch(Layout.prototype, {
     setup() {
         super.setup(...arguments);
@@ -71,30 +60,30 @@ patch(Layout.prototype, {
             try {
                 const action = getAction(this.env);
                 if (!action) return;
-
                 const k = getActionKey(action);
                 if (!k) return;
 
-                // avoid switching more than once per action load
-                const appliedKey = k + APPLIED_SUFFIX;
-                if (sessionStorage.getItem(appliedKey)) return;
-
-                const stored = window.localStorage.getItem(k);
-                if (!stored) return;
-
                 const allowed = getAllowedViewTypes(action);
                 const currentView = getCurrentViewFromLayout(this);
+                if (!currentView) return;
 
-                if (allowed.has(stored) && stored !== currentView) {
+                // 1) If no stored value yet, initialize to the current view
+                const stored = localStorage.getItem(k);
+                if (!stored && allowed.has(currentView)) {
+                    localStorage.setItem(k, currentView);
+                    return; // first load: just initialize, don't switch
+                }
+
+                // 2) If we do have a stored value and it's different & allowed, switch once
+                const appliedKey = k + APPLIED_SUFFIX;
+                if (!sessionStorage.getItem(appliedKey) && stored && allowed.has(stored) && stored !== currentView) {
                     sessionStorage.setItem(appliedKey, "1");
                     this.env.services.action.doAction(action, {
                         viewType: stored,
-                        replaceCurrentAction: true, // avoids breadcrumb duplication
+                        replaceCurrentAction: true, // keep breadcrumbs clean
                     });
                 }
-            } catch {
-                // fail-safe: do nothing
-            }
+            } catch {}
         });
     },
 });
