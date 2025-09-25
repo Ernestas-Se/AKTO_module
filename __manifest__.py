@@ -2,7 +2,7 @@
 {
     "name": "AKTO module for functionality additions and customizations",
     "summary": "",
-    "version": "19.0.1.3.3",
+    "version": "19.0.1.3.4",
     "license": "LGPL-3",
     "author": "AKTO",
     "depends": ["product", "web"],
@@ -14,8 +14,7 @@
     ],
     "assets": {
         "web.assets_backend": [
-            "AKTO_module/static/src/js/remember_last_view_action_service.js",
-            "AKTO_module/static/src/js/remember_last_view.js",
+            "AKTO_module/static/src/js/akto_last_view_service.js",
         ],
     },
     "installable": True,
