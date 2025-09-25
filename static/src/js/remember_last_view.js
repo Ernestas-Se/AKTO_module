@@ -1,80 +1,98 @@
 /** @odoo-module **/
 
 /**
- * Odoo 17/18/19 (OWL) webclient patch:
- * - Store the selected view type when the user switches views.
- * - Next time the same action/menu opens, prefer the stored view
- *   if it’s available in the action's view list.
+ * Remember the last view (kanban/list/…) used for each action and restore it
+ * next time that action is opened.
  *
- * Notes:
- * - This is intentionally minimal and uses localStorage.
- * - If you want server-side persistence (works across browsers),
- *   we can store the mapping on res.users in a JSON field instead.
+ * - Stores per-action view type in localStorage (per browser).
+ * - Only switches if the stored view exists for the action.
+ * - Uses the v17+ patch API (patch(target, extensionObject)).
  */
 
 import { patch } from "@web/core/utils/patch";
 import { Layout } from "@web/search/layout";
 
 const KEY_PREFIX = "akto:last_view:";
+const APPLIED_SUFFIX = ":applied_once";
 
-function actionKey(env) {
-    // Current action controller: holds the action descriptor with id, views, etc.
-    const ctrl = env.services.action?.currentController;
-    const action = ctrl?.action;
-    // Fall back to xml_id if present; otherwise numeric id
+function getAction(env) {
+    return env.services.action?.currentController?.action;
+}
+function getActionKey(action) {
     return action ? `${KEY_PREFIX}${action.xml_id || action.id}` : null;
 }
+function getAllowedViewTypes(action) {
+    const allowed = new Set();
+    if (action?.view_mode) {
+        action.view_mode.split(",").forEach((m) => allowed.add(m.trim()));
+    }
+    if (Array.isArray(action?.views)) {
+        for (const pair of action.views) {
+            // pair format: [view_id, view_type]
+            if (pair && pair[1]) allowed.add(String(pair[1]).trim());
+        }
+    }
+    return allowed;
+}
+function getCurrentViewFromLayout(layoutInstance) {
+    // Different Odoo builds may expose the current view type on props as
+    // `activeView` or nested under `display.activeView`.
+    return (
+        layoutInstance.props?.activeView ||
+        layoutInstance.props?.display?.activeView ||
+        null
+    );
+}
 
-// 1) Remember the view when user switches via the view switcher
-patch(Layout.prototype, "akto_last_view.remember_on_switch", {
+/* 1) When the user switches view via the view switcher, remember it. */
+patch(Layout.prototype, {
     async onSwitchView(ev) {
-        // ev.detail?.viewType is used by the view switcher buttons
-        const res = await this._super(ev);
+        const res = await super.onSwitchView(...arguments);
         try {
-            const k = actionKey(this.env);
-            const v = ev?.detail?.viewType || this.props.activeView;
+            const action = getAction(this.env);
+            const k = getActionKey(action);
+            const v = ev?.detail?.viewType || getCurrentViewFromLayout(this);
             if (k && v) {
                 window.localStorage.setItem(k, v);
             }
-        } catch (e) {
+        } catch {
             // ignore storage errors
         }
         return res;
     },
 });
 
-// 2) When Layout initializes, if there is a stored view and it's available,
-//    ask the action service to relaunch with that view (without breaking breadcrumbs)
-patch(Layout.prototype, "akto_last_view.apply_on_load", {
+/* 2) On load, if we have a stored view for this action and it is allowed,
+      relaunch the action once with that view (keeps breadcrumbs clean). */
+patch(Layout.prototype, {
     setup() {
-        this._super();
+        super.setup(...arguments);
         queueMicrotask(() => {
             try {
-                const ctrl = this.env.services.action?.currentController;
-                const action = ctrl?.action;
-                const k = actionKey(this.env);
-                const stored = k && window.localStorage.getItem(k);
-                if (!action || !stored) return;
+                const action = getAction(this.env);
+                if (!action) return;
 
-                // Gather allowed view types from the action
-                const allowed = new Set();
-                if (action.view_mode) {
-                    action.view_mode.split(",").forEach((m) => allowed.add(m.trim()));
-                }
-                if (action.views) {
-                    for (const [, t] of action.views) allowed.add(t);
-                }
+                const k = getActionKey(action);
+                if (!k) return;
 
-                // Only switch if the stored view exists and isn't already active
-                const currentView = this.props.activeView;
+                // avoid switching more than once per action load
+                const appliedKey = k + APPLIED_SUFFIX;
+                if (sessionStorage.getItem(appliedKey)) return;
+
+                const stored = window.localStorage.getItem(k);
+                if (!stored) return;
+
+                const allowed = getAllowedViewTypes(action);
+                const currentView = getCurrentViewFromLayout(this);
+
                 if (allowed.has(stored) && stored !== currentView) {
-                    // Re-run the same action but ask for a specific viewType
+                    sessionStorage.setItem(appliedKey, "1");
                     this.env.services.action.doAction(action, {
                         viewType: stored,
-                        replaceCurrentAction: true, // avoid breadcrumb duplication
+                        replaceCurrentAction: true, // avoids breadcrumb duplication
                     });
                 }
-            } catch (e) {
+            } catch {
                 // fail-safe: do nothing
             }
         });
