@@ -2,15 +2,13 @@
 {
     "name": "AKTO module for functionality additions and customizations",
     "summary": "",
-    "version": "19.0.1.3.5",
+    "version": "19.0.1.3.6",
     "license": "LGPL-3",
     "author": "AKTO",
     "depends": ["product", "web"],
     "data": [
         "views/AKTO_label_names_change.xml",
-        "views/AKTO_product_template_form_safety.xml",
-        "views/AKTO_product_template_form_name_change.xml",
-        "views/AKTO_product_template_views.xml"
+        "views/AKTO_product_template_form_name_change.xml"
     ],
     "assets": {
         "web.assets_backend": [

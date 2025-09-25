@@ -4,11 +4,6 @@ from odoo import api, fields, models # pyright: ignore[reportMissingImports]
 class ProductTemplate(models.Model):
     _inherit = "product.template"
 
-    safety_stock = fields.Float(
-        string="Safety Stock",
-        help="Placeholder field for safety stock. No logic or computation yet.",
-    )
-
     name_code = fields.Char(
         string="Code + Name",
         compute="_compute_name_code",

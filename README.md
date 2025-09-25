@@ -2,7 +2,6 @@
 
 ## Overview
 This Odoo 19 module provides enhancements and customizations for product management, including:
-- Safety Stock field for products
 - Custom product form tweaks
 - Unique item code enforcement (case-insensitive, ignores blanks)
 - Label and view overrides for product templates and variants
@@ -12,7 +11,6 @@ This Odoo 19 module provides enhancements and customizations for product managem
 - `product.product`: Product variant model, with unique code constraints and label overrides.
 
 ## Features
-- Adds a `safety_stock` field to product templates.
 - Enforces uniqueness and non-blank values for the `default_code` (now labeled as "No.").
 - Customizes product form views to display and style the code and name fields.
 
