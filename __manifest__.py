@@ -2,7 +2,7 @@
 {
     "name": "AKTO module for functionality additions and customizations",
     "summary": "",
-    "version": "19.0.1.3.4",
+    "version": "19.0.1.3.5",
     "license": "LGPL-3",
     "author": "AKTO",
     "depends": ["product", "web"],

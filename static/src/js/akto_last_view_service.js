@@ -2,25 +2,63 @@
 
 /**
  * AKTO - Remember last used view (kanban/list/...) per action.
- *
- * Works by wrapping the live `action` service instance:
- *  - inject stored viewType into doAction if none provided
- *  - persist viewType after navigation or when switching views
- *
- * Odoo 17/18/19 – use the service registry, not a class prototype.
+ * Stores AND looks up by BOTH xml_id and numeric id, and keeps a map id->xml_id.
  */
 
 import { registry } from "@web/core/registry";
 import { patch } from "@web/core/utils/patch";
 
 const KEY_PREFIX = "akto:last_view:";
+const MAP_XML_BY_ID = "akto:last_view:xml_by_id:"; // e.g., akto:last_view:xml_by_id:1234 -> "stock.product_template_action_product"
+
+function kXml(xmlId)        { return `${KEY_PREFIX}${xmlId}`; }
+function kId(id)            { return `${KEY_PREFIX}${id}`; }
+function kMapId(id)         { return `${MAP_XML_BY_ID}${id}`; }
 
 function keyFromAction(action) {
-    return action ? `${KEY_PREFIX}${action.xml_id || action.id}` : null;
+    if (!action) return { idKey: null, xmlKey: null };
+    return { idKey: kId(action.id), xmlKey: action.xml_id ? kXml(action.xml_id) : null };
 }
-function keyFromRequest(req) {
-    if (typeof req === "number" || typeof req === "string") return `${KEY_PREFIX}${req}`;
-    if (req && (req.xml_id || req.id)) return `${KEY_PREFIX}${req.xml_id || req.id}`;
+
+function ensureStore(action, viewType) {
+    try {
+        const { idKey, xmlKey } = keyFromAction(action);
+        if (viewType) {
+            if (idKey)  localStorage.setItem(idKey, viewType);
+            if (xmlKey) localStorage.setItem(xmlKey, viewType);
+            if (idKey && action?.xml_id) {
+                // remember mapping id -> xml_id for future lookups
+                localStorage.setItem(kMapId(action.id), action.xml_id);
+            }
+            console.log("[AKTO] stored", idKey, "and", xmlKey, "=", viewType);
+        }
+    } catch {}
+}
+
+function lookupStored(actionRequest) {
+    try {
+        // 1) Direct by request (string xml_id or numeric id)
+        if (typeof actionRequest === "string") {
+            const s = localStorage.getItem(kXml(actionRequest));
+            if (s) return s;
+        }
+        if (typeof actionRequest === "number") {
+            const s = localStorage.getItem(kId(actionRequest));
+            if (s) return s;
+            // 2) Try mapping id -> xml_id then lookup xml_id key
+            const xml = localStorage.getItem(kMapId(actionRequest));
+            if (xml) {
+                const s2 = localStorage.getItem(kXml(xml));
+                if (s2) return s2;
+            }
+        }
+        // 3) Request is an object {id, xml_id}
+        if (actionRequest && (actionRequest.id || actionRequest.xml_id)) {
+            const sObjId  = actionRequest.id     ? localStorage.getItem(kId(actionRequest.id))     : null;
+            const sObjXml = actionRequest.xml_id ? localStorage.getItem(kXml(actionRequest.xml_id)) : null;
+            return sObjId || sObjXml || null;
+        }
+    } catch {}
     return null;
 }
 
@@ -29,61 +67,47 @@ export const aktoLastViewService = {
     start(env, { action }) {
         console.log("[AKTO] last-view service starting");
 
-        // Wrap the live action service object
         patch(action, {
             async doAction(actionRequest, options = {}) {
                 try {
-                    // Inject stored viewType if the caller didn't specify one
-                    const k = keyFromRequest(actionRequest);
-                    if (k && !options.viewType) {
-                        const stored = localStorage.getItem(k);
+                    if (!options.viewType) {
+                        const stored = lookupStored(actionRequest);
                         if (stored) {
                             options = { ...options, viewType: stored };
-                            console.log("[AKTO] injecting stored viewType", stored, "for", k);
+                            console.log("[AKTO] injecting stored viewType", stored, "for", actionRequest);
                         }
                     }
                 } catch {}
 
                 const res = await super.doAction(actionRequest, options);
 
-                // Persist the view after navigation
+                // After navigation, persist under both id and xml_id (and remember the mapping)
                 try {
                     const ctrl = env.services.action.currentController;
-                    const k = keyFromAction(ctrl?.action) || keyFromRequest(actionRequest);
+                    const act  = ctrl?.action;
                     const used =
                         options.viewType ||
                         ctrl?.props?.view?.type ||
                         ctrl?.props?.display?.activeView ||
                         null;
-                    if (k && used) {
-                        localStorage.setItem(k, used);
-                        console.log("[AKTO] stored", k, "=", used);
-                    }
+                    ensureStore(act, used);
                 } catch {}
 
                 return res;
             },
 
             async switchView(viewType, kwargs) {
-                // Some builds use a direct switch; persist here too
+                // Persist the explicit user choice as well
                 try {
                     const ctrl = env.services.action.currentController;
-                    const k = keyFromAction(ctrl?.action);
-                    if (k && viewType) {
-                        localStorage.setItem(k, viewType);
-                        console.log("[AKTO] stored via switchView", k, "=", viewType);
-                    }
+                    ensureStore(ctrl?.action, viewType);
                 } catch {}
                 return super.switchView ? await super.switchView(viewType, kwargs) : undefined;
             },
         });
 
-        // Optional API (not used elsewhere, handy for debugging)
-        return {
-            get(actionKey) { return localStorage.getItem(`${KEY_PREFIX}${actionKey}`); },
-        };
+        return {}; // optional service API not needed
     },
 };
 
-// Register our tiny service so it starts with the webclient.
 registry.category("services").add("akto_last_view", aktoLastViewService);
