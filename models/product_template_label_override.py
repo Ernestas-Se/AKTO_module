@@ -2,7 +2,7 @@
 
 #Default label changes. Also need to do changes in AKTO_label_names_change.xml
 
-from odoo import fields, models
+from odoo import fields, models # pyright: ignore[reportMissingImports]
 
 #"Internal reference" to "No"
 class ProductTemplateLabelOverride(models.Model):

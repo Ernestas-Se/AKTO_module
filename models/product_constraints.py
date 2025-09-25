@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
-from odoo import api, models, _
-from odoo.exceptions import ValidationError
+from odoo import api, models, _ # pyright: ignore[reportMissingImports]
+from odoo.exceptions import ValidationError # pyright: ignore[reportMissingImports]
 
 
 def _raise_if_blank_or_duplicate(env, code, exclude_id=None):
