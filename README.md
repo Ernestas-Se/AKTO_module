@@ -13,6 +13,7 @@ This Odoo 19 module provides enhancements and customizations for product managem
 ## Features
 - Enforces uniqueness and non-blank values for the `default_code` (now labeled as "No.").
 - Customizes product form views to display and style the code and name fields.
+- Odoo remenbers your last used Product view
 
 ## File Structure
 - `models/`: Python files for model extensions and constraints.
