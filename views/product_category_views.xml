@@ -10,4 +10,19 @@
       </xpath>
     </field>
   </record>
+
+  <record id="akto_product_template_list_reorder" model="ir.ui.view">
+    <field name="name">akto.product.template.list.reorder</field>
+    <field name="model">product.template</field>
+    <!-- Use the real XML ID of the Products (Templates) List view -->
+    <field name="inherit_id" ref="product.product_template_tree_view"/>
+
+    <field name="arch" type="xml">
+      <!-- Move Internal Reference before Name -->
+      <xpath expr="//list/field[@name='name']" position="before">
+        <field name="default_code" position="move"/>
+      </xpath>
+      
+    </field>
+  </record>
 </odoo>
